@@ -8,10 +8,10 @@ Original file is located at
 """
 
 import sys
-!{sys.executable} -m 
+ 
 
 import sys
-!{sys.executable} -m 
+
 
 import streamlit as st
 import numpy as np
