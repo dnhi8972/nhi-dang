@@ -4,6 +4,6 @@ scikit-fuzzy
 folium
 requests
 geopy
-streamlit-folium
+streamlit-folium==0.21.0
 scipy
 networkx
