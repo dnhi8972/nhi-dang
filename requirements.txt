@@ -5,3 +5,4 @@ folium
 requests
 geopy
 streamlit-folium
+scipy
