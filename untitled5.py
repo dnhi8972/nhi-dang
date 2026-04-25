@@ -7,13 +7,13 @@ Original file is located at
     https://colab.research.google.com/drive/1ugcMFyrwNCZnmXrxz0dK3my8_O6me7r1
 """
 
-!pip install scikit-fuzzy
+
 
 import sys
-!{sys.executable} -m pip install streamlit
+
 
 import sys
-!{sys.executable} -m pip install streamlit-folium
+
 
 import streamlit as st
 import numpy as np
