@@ -7,11 +7,13 @@ Original file is located at
     https://colab.research.google.com/drive/1ugcMFyrwNCZnmXrxz0dK3my8_O6me7r1
 """
 
-import sys
- 
+!pip install scikit-fuzzy
 
 import sys
+!{sys.executable} -m pip install streamlit
 
+import sys
+!{sys.executable} -m pip install streamlit-folium
 
 import streamlit as st
 import numpy as np
@@ -113,102 +115,102 @@ gobike_sim = setup_fuzzy_logic()
 # ==============================================================================
 # PHẦN 2: GIAO DIỆN WEB
 # ==============================================================================
-ALL_LOCATIONS = {
-    'UEH CƠ SỞ A': [10.7818, 106.6953],
-    'UEH CƠ SỞ B': [10.7601, 106.6669],
-    'UEH CƠ SỞ C': [10.7744, 106.6782],
-    'UEH CƠ SỞ D': [10.7836, 106.6834],
-    'UEH CƠ SỞ E': [10.7675, 106.6675],
-    'UEH CƠ SỞ N (BÌNH CHÁNH)': [10.7088, 106.6661],
-    'UEH CƠ SỞ H (PHÚ NHUẬN)': [10.7978, 106.6763],
-    'KTX UEH NGUYỄN CHÍ THANH': [10.7605, 106.6645],
-    'HỒ CON RÙA': [10.7827, 106.6959],
-    'LANDMARK 81': [10.7947, 106.7218],
-    'AEON MALL TÂN PHÚ': [10.8030, 106.6160],
-    'GA SÀI GÒN': [10.7812, 106.6785],
-    'SÂN BAY TÂN SƠN NHẤT': [10.8185, 106.6588],
-    'DINH ĐỘC LẬP': [10.7770, 106.6953],
-    'NHÀ THỜ ĐỨC BÀ': [10.7798, 106.6990],
-    'CHỢ BẾN THÀNH': [10.7725, 106.6980]
-}
 
 st.markdown("<h1 style='text-align: center; color: #2ecc71;'>🛵 GOBIKE AI PREMIUM</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>Hệ thống đặt xe tích hợp Trí tuệ Nhân tạo & Mờ (Fuzzy Logic)</p>", unsafe_allow_html=True)
 
-# Form nhập liệu
+# Form nhập liệu địa chỉ tự do
 col1, col2 = st.columns(2)
 with col1:
-    pickup = st.selectbox('📍 Điểm đón', list(ALL_LOCATIONS.keys()))
+    pickup = st.text_input('📍 Điểm đón (Nhập địa chỉ)', placeholder='VD: Chợ Bến Thành, Quận 1, TP.HCM')
 with col2:
-    dropoff = st.selectbox('🏁 Điểm đến', list(ALL_LOCATIONS.keys()), index=1)
+    dropoff = st.text_input('🏁 Điểm đến (Nhập địa chỉ)', placeholder='VD: Landmark 81, Bình Thạnh, TP.HCM')
 
 if st.button('🛵 ĐẶT XE PREMIUM', use_container_width=True, type="primary"):
-    with st.spinner("Đang tính toán lộ trình và cước phí AI..."):
-        try:
-            geolocator = Nominatim(user_agent="gobike_premium")
-            coords = [ALL_LOCATIONS[pickup], ALL_LOCATIONS[dropoff]]
+    if not pickup or not dropoff:
+        st.warning("Vui lòng nhập đầy đủ Điểm đón và Điểm đến!")
+    else:
+        with st.spinner("Đang tìm kiếm tọa độ và tính toán lộ trình AI..."):
+            try:
+                # 1. Tìm tọa độ từ địa chỉ người dùng nhập
+                geolocator = Nominatim(user_agent="gobike_premium")
+                location_pickup = geolocator.geocode(pickup)
+                location_dropoff = geolocator.geocode(dropoff)
 
-            # Lấy OSRM
-            osrm_url = f"http://router.project-osrm.org/route/v1/driving/{coords[0][1]},{coords[0][0]};{coords[1][1]},{coords[1][0]}?overview=full&geometries=geojson"
-            res = requests.get(osrm_url).json()
+                if not location_pickup:
+                    st.error(f"❌ Không tìm thấy tọa độ cho điểm đón: **{pickup}**. Vui lòng nhập rõ ràng hơn (VD thêm Tên Đường, Quận, Thành phố).")
+                elif not location_dropoff:
+                    st.error(f"❌ Không tìm thấy tọa độ cho điểm đến: **{dropoff}**. Vui lòng nhập rõ ràng hơn (VD thêm Tên Đường, Quận, Thành phố).")
+                else:
+                    # Lấy tọa độ [Vĩ độ, Kinh độ]
+                    coords = [
+                        [location_pickup.latitude, location_pickup.longitude],
+                        [location_dropoff.latitude, location_dropoff.longitude]
+                    ]
 
-            if res.get('code') != 'Ok':
-                st.error("Lỗi từ server chỉ đường. Vui lòng thử lại sau.")
-            else:
-                km = res['routes'][0]['distance'] / 1000
-                duration_mins = res['routes'][0]['duration'] / 60
+                    # 2. Gọi API OSRM để lấy khoảng cách và thời gian
+                    osrm_url = f"http://router.project-osrm.org/route/v1/driving/{coords[0][1]},{coords[0][0]};{coords[1][1]},{coords[1][0]}?overview=full&geometries=geojson"
+                    res = requests.get(osrm_url).json()
 
-                # Giả lập input (bạn có thể tạo thêm thanh kéo trượt để người dùng tự chọn thời tiết/giao thông)
-                weather_input = 5
-                traffic_input = 8
-                time_day_input = 1
+                    if res.get('code') != 'Ok':
+                        st.error("Lỗi từ server chỉ đường (OSRM). Vui lòng thử lại sau.")
+                    else:
+                        km = res['routes'][0]['distance'] / 1000
+                        duration_mins = res['routes'][0]['duration'] / 60
 
-                gobike_sim.input['distance'] = min(km, 20)
-                gobike_sim.input['weather'] = weather_input
-                gobike_sim.input['traffic'] = traffic_input
-                gobike_sim.input['time_day'] = time_day_input
-                gobike_sim.compute()
+                        # 3. Tính toán Surge Pricing bằng Fuzzy Logic
+                        weather_input = 5
+                        traffic_input = 8
+                        time_day_input = 1
 
-                surge_val = gobike_sim.output['surge_score']
-                fare = 12000 + (km * 4500) + (surge_val * 220)
+                        gobike_sim.input['distance'] = min(km, 20)
+                        gobike_sim.input['weather'] = weather_input
+                        gobike_sim.input['traffic'] = traffic_input
+                        gobike_sim.input['time_day'] = time_day_input
+                        gobike_sim.compute()
 
-                # --- GIAO DIỆN APP (HTML Custom giữ nguyên)
-                html_card = f"""
-                <div style="background: #ffffff; border-radius: 40px; box-shadow: 0 15px 50px rgba(0,0,0,0.1); padding: 35px; max-width: 500px; font-family: 'Courier New', Courier, monospace; margin: 20px auto; border: 1px solid #eee; text-align: center;">
-                    <div style="background: #e8f5e9; color: #2e7d32; display: inline-block; padding: 5px 20px; border-radius: 20px; font-size: 14px; font-weight: 900; letter-spacing: 2px; margin-bottom: 25px;">
-                        GOBIKE AI PREMIUM
-                    </div>
-                    <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
-                        <div style="flex: 1; background: #fff; border: 2px solid #2ecc71; border-radius: 25px; padding: 15px; border-bottom: 8px solid #2ecc71;">
-                            <div style="font-size: 30px; margin-bottom: 5px;">🛣️</div>
-                            <div style="font-size: 12px; color: #7f8c8d; font-weight: 800; margin-bottom: 10px;">KHOẢNG CÁCH</div>
-                            <div style="font-size: 24px; font-weight: 900; color: #2c3e50;">{km:.2f} <span style="font-size: 16px; color: #27ae60;">km</span></div>
+                        surge_val = gobike_sim.output['surge_score']
+                        fare = 12000 + (km * 4500) + (surge_val * 220)
+
+                        # --- GIAO DIỆN APP (HTML Custom giữ nguyên) ---
+                        html_card = f"""
+                        <div style="background: #ffffff; border-radius: 40px; box-shadow: 0 15px 50px rgba(0,0,0,0.1); padding: 35px; max-width: 500px; font-family: 'Courier New', Courier, monospace; margin: 20px auto; border: 1px solid #eee; text-align: center;">
+                            <div style="background: #e8f5e9; color: #2e7d32; display: inline-block; padding: 5px 20px; border-radius: 20px; font-size: 14px; font-weight: 900; letter-spacing: 2px; margin-bottom: 25px;">
+                                GOBIKE AI PREMIUM
+                            </div>
+                            <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+                                <div style="flex: 1; background: #fff; border: 2px solid #2ecc71; border-radius: 25px; padding: 15px; border-bottom: 8px solid #2ecc71;">
+                                    <div style="font-size: 30px; margin-bottom: 5px;">🛣️</div>
+                                    <div style="font-size: 12px; color: #7f8c8d; font-weight: 800; margin-bottom: 10px;">KHOẢNG CÁCH</div>
+                                    <div style="font-size: 24px; font-weight: 900; color: #2c3e50;">{km:.2f} <span style="font-size: 16px; color: #27ae60;">km</span></div>
+                                </div>
+                                <div style="flex: 1; background: #fff; border: 2px solid #2ecc71; border-radius: 25px; padding: 15px; border-bottom: 8px solid #2ecc71;">
+                                    <div style="font-size: 30px; margin-bottom: 5px;">⏱️</div>
+                                    <div style="font-size: 12px; color: #7f8c8d; font-weight: 800; margin-bottom: 10px;">THỜI GIAN</div>
+                                    <div style="font-size: 24px; font-weight: 900; color: #2c3e50;">{round(duration_mins)} <span style="font-size: 16px; color: #27ae60;">phút</span></div>
+                                </div>
+                            </div>
+                            <div style="background: #1a1a1a; border-radius: 30px; padding: 30px; color: white; position: relative; overflow: hidden;">
+                                <div style="font-size: 14px; color: #bdc3c7; margin-bottom: 15px; letter-spacing: 1px;">TỔNG CƯỚC THANH TOÁN</div>
+                                <div style="font-size: 48px; font-weight: 900; color: #f1c40f;">{round(fare, -2):,.0f} <span style="font-size: 24px; border-bottom: 4px solid #f1c40f;">đ</span></div>
+                                <div style="margin-top: 25px; border-top: 1px solid #333; padding-top: 15px;">
+                                    <span style="color: #2ecc71; font-size: 13px;">● AI SURGE ACTIVE</span>
+                                    <span style="color: #bdc3c7; font-size: 13px; margin-left: 10px;">| {surge_val:.1f}% Surge</span>
+                                </div>
+                            </div>
                         </div>
-                        <div style="flex: 1; background: #fff; border: 2px solid #2ecc71; border-radius: 25px; padding: 15px; border-bottom: 8px solid #2ecc71;">
-                            <div style="font-size: 30px; margin-bottom: 5px;">⏱️</div>
-                            <div style="font-size: 12px; color: #7f8c8d; font-weight: 800; margin-bottom: 10px;">THỜI GIAN</div>
-                            <div style="font-size: 24px; font-weight: 900; color: #2c3e50;">{round(duration_mins)} <span style="font-size: 16px; color: #27ae60;">phút</span></div>
-                        </div>
-                    </div>
-                    <div style="background: #1a1a1a; border-radius: 30px; padding: 30px; color: white; position: relative; overflow: hidden;">
-                        <div style="font-size: 14px; color: #bdc3c7; margin-bottom: 15px; letter-spacing: 1px;">TỔNG CƯỚC THANH TOÁN</div>
-                        <div style="font-size: 48px; font-weight: 900; color: #f1c40f;">{round(fare, -2):,.0f} <span style="font-size: 24px; border-bottom: 4px solid #f1c40f;">đ</span></div>
-                        <div style="margin-top: 25px; border-top: 1px solid #333; padding-top: 15px;">
-                            <span style="color: #2ecc71; font-size: 13px;">● AI SURGE ACTIVE</span>
-                            <span style="color: #bdc3c7; font-size: 13px; margin-left: 10px;">| {surge_val:.1f}% Surge</span>
-                        </div>
-                    </div>
-                </div>
-                """
-                st.markdown(html_card, unsafe_allow_html=True)
+                        """
+                        st.markdown(html_card, unsafe_allow_html=True)
 
-                # --- VẼ BẢN ĐỒ ---
-                m = folium.Map(location=coords[0], zoom_start=14)
-                folium.PolyLine([[p[1], p[0]] for p in res['routes'][0]['geometry']['coordinates']], color="#2ecc71", weight=8, opacity=0.8).add_to(m)
-                folium.Marker(coords[0], icon=folium.Icon(color='green', icon='home')).add_to(m)
-                folium.Marker(coords[1], icon=folium.Icon(color='red', icon='flag')).add_to(m)
+                        # --- VẼ BẢN ĐỒ ---
+                        m = folium.Map(location=coords[0], zoom_start=14)
+                        folium.PolyLine([[p[1], p[0]] for p in res['routes'][0]['geometry']['coordinates']], color="#2ecc71", weight=8, opacity=0.8).add_to(m)
 
-                st_folium(m, width=700, height=500, returned_objects=[])
+                        # Thêm popup mô tả cho các điểm marker
+                        folium.Marker(coords[0], tooltip="Điểm Đón", popup=location_pickup.address, icon=folium.Icon(color='green', icon='home')).add_to(m)
+                        folium.Marker(coords[1], tooltip="Điểm Đến", popup=location_dropoff.address, icon=folium.Icon(color='red', icon='flag')).add_to(m)
 
-        except Exception as e:
-            st.error(f"⚠️ Đã có lỗi xảy ra: {e}")
+                        st_folium(m, width=700, height=500, returned_objects=[])
+
+            except Exception as e:
+                st.error(f"⚠️ Đã có lỗi xảy ra trong quá trình xử lý: {e}")
