@@ -1,9 +1,4 @@
-streamlit
+pandas
 numpy
-scikit-fuzzy
-folium
-requests
-geopy
-streamlit-folium==0.21.0
-scipy
-networkx
+scikit-learn
+streamlit
