@@ -17,30 +17,28 @@ def load_assets():
 
 try:
     model, model_columns, brand_map = load_assets()
-except:
-    st.error("⚠️ Không tìm thấy các file dữ liệu (.pkl). Hãy chạy code train trên Colab trước!")
+except Exception as e:
+    st.error(f"⚠️ Lỗi tải dữ liệu: {e}")
     st.stop()
 
 st.title("🏍️ Hệ thống định giá xe máy cũ")
-st.write("Dự báo giá dựa trên dữ liệu thị trường mới nhất")
+st.write("Dự báo giá dựa trên dữ liệu thị trường thực tế")
 
 col1, col2 = st.columns(2)
 
 with col1:
     hang = st.selectbox("Chọn hãng xe", list(brand_map.keys()))
-    # Loại xe sẽ thay đổi theo Hãng đã chọn
     loai_xe = st.selectbox("Chọn dòng xe", brand_map[hang])
-    doi_xe = st.number_input("Năm sản xuất (Đời xe)", 2010, 2025, 2022)
+    doi_xe = st.number_input("Năm sản xuất", 2010, 2025, 2023)
 
 with col2:
-    so_km = st.number_input("Số KM đã đi", 0, 500000, 10000)
-    # Lấy danh sách tình trạng mẫu (hoặc bạn có thể tự nhập list)
+    so_km = st.number_input("Số KM đã đi", 0, 500000, 5000)
     tinh_trang = st.selectbox("Tình trạng xe", ["Mới - Không trầy xước", "Cũ - Trầy xước nhẹ", "Cũ - Hư hỏng"])
 
 if st.button("Dự đoán giá ngay"):
     tuoi_xe = 2025 - doi_xe
     
-    # Tạo input chuẩn
+    # Tạo dữ liệu đầu vào
     input_df = pd.DataFrame({
         'Số KM': [so_km],
         'Tuổi xe': [tuoi_xe],
@@ -49,11 +47,10 @@ if st.button("Dự đoán giá ngay"):
         'Tình trạng xe (Cũ/Mới - Trầy xước/Hư hỏng)': [tinh_trang]
     })
     
-    # One-hot encoding
-    input_encoded = pd.get_dummies(input_data) # Lỗi nhẹ ở đây, sửa thành:
+    # Mã hóa giống lúc train
     input_encoded = pd.get_dummies(input_df)
     
-    # Khớp cột
+    # Khớp các cột với mô hình
     final_input = pd.DataFrame(columns=model_columns).fillna(0)
     final_input = pd.concat([final_input, input_encoded], axis=0).fillna(0)
     final_input = final_input[model_columns]
@@ -62,5 +59,8 @@ if st.button("Dự đoán giá ngay"):
     res = model.predict(final_input)[0]
     
     st.divider()
-    st.subheader(f"Giá dự báo: :green[{res:,.0f} VNĐ]")
-    st.info("Mức giá này dựa trên các dòng xe tương tự trong hệ thống dữ liệu của bạn.")
+    if res < 0:
+        st.warning("Thông tin xe không hợp lệ để định giá.")
+    else:
+        st.success(f"### Giá dự báo: {res:,.0f} VNĐ")
+        st.balloons()
