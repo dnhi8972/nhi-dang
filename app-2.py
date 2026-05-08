@@ -21,33 +21,44 @@ def load_assets():
 model, model_columns, brand_map = load_assets()
 
 if model is None:
-    st.error("⚠️ Thiếu file .pkl trên GitHub. Hãy kiểm tra lại!")
+    st.error("⚠️ Không tìm thấy file dữ liệu trên GitHub!")
     st.stop()
 
-st.title("🏍️ Định giá xe máy AI")
+st.title("🏍️ Hệ thống định giá xe máy AI")
 
-# Giao diện nhập liệu
-hang = st.selectbox("Hãng xe", list(brand_map.keys()))
-loai_xe = st.selectbox("Dòng xe", brand_map[hang])
-doi_xe = st.number_input("Năm sản xuất", 2010, 2025, 2023)
-so_km = st.number_input("Số KM đã đi", 0, 500000, 5000)
-tinh_trang = st.selectbox("Tình trạng", [
-    "Mới (Đẹp, nguyên zin)", 
-    "Cũ (Trầy xước nhẹ)", 
-    "Cũ (Trầy nhiều, hao mòn)"
-])
+col1, col2 = st.columns(2)
 
-if st.button("Dự báo giá"):
-    # 1. Chuẩn bị dữ liệu input (Toàn bộ là 0)
-    X_input = pd.DataFrame(columns=model_columns)
+with col1:
+    hang = st.selectbox("Chọn hãng xe", list(brand_map.keys()))
+    loai_xe = st.selectbox("Chọn dòng xe", brand_map[hang])
+    doi_xe = st.number_input("Năm sản xuất", 2010, 2025, 2023)
+
+with col2:
+    so_km = st.number_input("Số KM đã đi", 0, 500000, 5000)
+    tinh_trang = st.selectbox("Tình trạng thực tế", [
+        "Mới (Đẹp, nguyên zin)", 
+        "Cũ (Trầy xước nhẹ)", 
+        "Cũ (Trầy nhiều, hao mòn)"
+    ])
+
+if st.button("DỰ ĐOÁN GIÁ NGAY", use_container_width=True):
+    # Tạo bảng input với toàn bộ cột đã học
+    X_input = pd.DataFrame(columns=model_columns).fillna(0)
     X_input.loc[0] = 0
     
-    # 2. Điền các giá trị số
-    if 'Số KM' in X_input.columns: X_input['Số KM'] = so_km
-    if 'Tuổi xe' in X_input.columns: X_input['Tuổi xe'] = 2025 - doi_xe
+    # Điền số
+    X_input['Số KM'] = so_km
+    X_input['Tuổi xe'] = 2025 - doi_xe
     
-    # 3. Gán giá trị 1 cho các cột chữ (CƠ CHẾ AN TOÀN)
-    # Nếu không tìm thấy cột chính xác, nó sẽ không báo lỗi mà chỉ bỏ qua
+    # Chuyển chữ thành số (Phải khớp 100% với lúc train)
+    mapping = {
+        "Mới (Đẹp, nguyên zin)": 3,
+        "Cũ (Trầy xước nhẹ)": 2,
+        "Cũ (Trầy nhiều, hao mòn)": 1
+    }
+    X_input['Tình trạng số'] = mapping[tinh_trang]
+    
+    # Điền Hãng và Loại xe
     def safe_set(prefix, value):
         col_name = f"{prefix}_{value}"
         if col_name in X_input.columns:
@@ -55,11 +66,7 @@ if st.button("Dự báo giá"):
 
     safe_set("Hãng", hang)
     safe_set("Loại xe", loai_xe)
-    safe_set("Tình trạng chuẩn", tinh_trang)
 
-    # 4. Dự đoán
-    try:
-        res = model.predict(X_input)[0]
-        st.success(f"### Giá dự báo: {max(res, 1000000):,.0f} VNĐ")
-    except Exception as e:
-        st.error(f"Lỗi: {e}")
+    # Dự đoán
+    res = model.predict(X_input)[0]
+    st.success(f"### Giá dự báo: {max(res, 1000000):,.0f} VNĐ")
