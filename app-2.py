@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import pickle
 
-st.set_page_config(page_title="Dự đoán giá bán xe máy cũ", page_icon="🏍️")
+st.set_page_config(page_title="Motocheck - Dự đoán giá xe máy", page_icon="🏍️")
 
 @st.cache_resource
 def load_assets():
@@ -24,7 +24,19 @@ if model is None:
     st.error("⚠️ Không tìm thấy file dữ liệu trên GitHub!")
     st.stop()
 
-st.title("🏍️ Dự đoán giá bán xe máy cũ")
+# Tiêu đề thiết kế riêng
+st.markdown("""
+    <div style="text-align: center;">
+        <p style="font-size: 24px; margin-bottom: 0px; color: #555; font-weight: bold;">
+            Dự đoán giá bán xe máy cũ
+        </p>
+        <h1 style="font-size: 85px; margin-top: -10px; color: #FF4B4B; font-family: 'Arial Black', sans-serif; letter-spacing: -2px;">
+            Motocheck
+        </h1>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True) # Tạo một khoảng cách nhỏ bên dưới tiêu đề
 
 col1, col2 = st.columns(2)
 
