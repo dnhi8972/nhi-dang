@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import pickle
 
-st.set_page_config(page_title="Định giá xe máy AI", page_icon="🏍️")
+st.set_page_config(page_title="Dự đoán giá bán xe máy cũ", page_icon="🏍️")
 
 @st.cache_resource
 def load_assets():
@@ -24,7 +24,7 @@ if model is None:
     st.error("⚠️ Không tìm thấy file dữ liệu trên GitHub!")
     st.stop()
 
-st.title("🏍️ Hệ thống định giá xe máy AI")
+st.title("🏍️ Dự đoán giá bán xe máy cũ")
 
 col1, col2 = st.columns(2)
 
