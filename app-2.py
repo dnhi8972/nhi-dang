@@ -30,7 +30,7 @@ st.markdown("""
         <p style="font-size: 24px; margin-bottom: 0px; color: #555; font-weight: bold;">
             Dự đoán giá bán xe máy cũ
         </p>
-        <h1 style="font-size: 85px; margin-top: -10px; color: #FF4B4B; font-family: 'Arial Black', sans-serif; letter-spacing: -2px;">
+        <h1 style="font-size: 70px; margin-top: -10px; color: #FF4B4B; font-family: 'Arial Black', sans-serif; letter-spacing: -2px;">
             Motocheck
         </h1>
     </div>
