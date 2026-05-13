@@ -33,7 +33,7 @@ if model is None:
     st.error("⚠️ Không tìm thấy file mô hình! Hãy kiểm tra lại GitHub.")
     st.stop()
 
-st.subheader("📊 Nhập thông số chính xác từ file CSV để Test")
+st.subheader("📊 Nhập thông số sinh hoạt hằng ngày của bạn ")
 col1, col2 = st.columns(2)
 
 with col1:
