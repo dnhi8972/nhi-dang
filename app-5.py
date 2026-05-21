@@ -17,7 +17,6 @@ st.markdown("""
 
 st.write("---")
 
-# Tải mô hình đã train
 @st.cache_resource
 def load_model():
     try:
@@ -32,7 +31,6 @@ if model is None:
     st.error("⚠️ Không tìm thấy file mô hình 'geometry_perceptron.pkl'. Vui lòng upload lên GitHub!")
     st.stop()
 
-# Từ điển ánh xạ kết quả
 shape_labels = {
     0: "Hình Tròn 🔴",
     1: "Hình Tam Giác 🔺",
@@ -43,13 +41,14 @@ shape_labels = {
 }
 
 st.subheader("✍️ Hãy vẽ một hình học xuống bảng dưới đây:")
+st.caption("💡 Mẹo: Vẽ hình to rõ ràng ở chính giữa bảng để AI dễ nhận diện chính xác nhất nhé!")
 
-# Tạo bảng vẽ Real-time
+# Tạo bảng vẽ Real-time với nét cọ tối ưu (stroke_width=14)
 canvas_result = st_canvas(
-    fill_color="rgba(255, 255, 255, 0)",  # Không màu nền cho nét vẽ
-    stroke_width=12,                      # Độ dày nét vẽ
-    stroke_color="#FFFFFF",               # Nét vẽ màu trắng
-    background_color="#000000",           # Bảng nền đen giống môi trường học của AI
+    fill_color="rgba(255, 255, 255, 0)",  
+    stroke_width=14,                      
+    stroke_color="#FFFFFF",               
+    background_color="#000000",           
     update_streamlit=True,
     height=300,
     width=300,
@@ -57,20 +56,17 @@ canvas_result = st_canvas(
     key="canvas",
 )
 
-# Xử lý hình ảnh khi người dùng vẽ
 if canvas_result.image_data is not None:
-    # Kiểm tra xem người dùng đã vẽ nét nào chưa (tránh nhận diện bảng trống)
+    # Kiểm tra xem có nét vẽ nào trên bảng chưa
     if np.sum(canvas_result.image_data[:, :, 0]) > 0:
         
-        # Chuyển đổi ảnh từ bảng vẽ về dạng grayscale và resize thành 28x28
+        # Xử lý đưa nét vẽ về ma trận 28x28 chuẩn hóa giống lúc train
         img = Image.fromarray(canvas_result.image_data.astype('uint8')).convert('L')
         img_resized = img.resize((28, 28))
         img_array = np.array(img_resized) / 255.0
         
-        # Duỗi phẳng dữ liệu đầu vào thành 1 hàng (784 cột) đem đi dự đoán
-        flat_data = img_array.flatten().reshape(1, -1)
-        
         # Dự đoán kết quả
+        flat_data = img_array.flatten().reshape(1, -1)
         pred_class = model.predict(flat_data)[0]
         result_text = shape_labels[pred_class]
         
