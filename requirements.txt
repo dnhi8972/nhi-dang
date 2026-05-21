@@ -1,4 +1,5 @@
-pandas
-numpy
-scikit-learn
 streamlit
+streamlit-drawable-canvas
+scikit-learn
+numpy
+Pillow
