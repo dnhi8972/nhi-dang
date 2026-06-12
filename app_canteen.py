@@ -42,7 +42,7 @@ TRAY_COORDS = {
 @st.cache_resource
 def load_ai_model():
     # Load mô hình hoàn hảo nhất bạn vừa train xong
-    return tf.keras.models.load_model('mo_hinh_mobilenet_12_mon_HOAN_HAO.h5')
+    return tf.keras.models.load_model('mo_hinh_mobilenet_12_mon_HOAN_HAO.h5', compile=False)
 
 def generate_qr_code(amount):
     qr_data = f"Thanh toan Canteen: {amount:,.0f} VND\nSTK: 123456789 (MOCK)"
