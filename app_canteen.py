@@ -5,9 +5,10 @@ import qrcode
 from PIL import Image
 import tensorflow as tf
 import io
+import json
 
 # ==========================================================
-# 🔥 BỘ VÁ LỖI CẤU HÌNH KERAS TỰ ĐỘNG - SỬA TRIỆT ĐỂ LỖI QUÀI
+# 🔥 BỘ VÁ LỖI CẤU HÌNH KERAS TỰ ĐỘNG
 # ==========================================================
 def fix_streamlit_keras_bug():
     def strip_bad_keys(d):
@@ -19,7 +20,6 @@ def fix_streamlit_keras_bug():
         elif isinstance(d, list):
             for item in d:
                 strip_bad_keys(item)
-    
     try:
         import keras.src.legacy.saving.serialization as legacy_serialization
         orig_deserialize = legacy_serialization.deserialize_keras_object
@@ -30,17 +30,6 @@ def fix_streamlit_keras_bug():
     except Exception:
         pass
 
-    try:
-        import keras.saving.serialization_lib as serialization_lib
-        orig_deserialize_lib = serialization_lib.deserialize_keras_object
-        def patched_deserialize_lib(identifier, *args, **kwargs):
-            strip_bad_keys(identifier)
-            return orig_deserialize_lib(identifier, *args, **kwargs)
-        serialization_lib.deserialize_keras_object = patched_deserialize_lib
-    except Exception:
-        pass
-
-# Kích hoạt bộ lọc lỗi trước khi nạp Model
 fix_streamlit_keras_bug()
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
@@ -50,9 +39,15 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 st.set_page_config(page_title="AI Canteen Smart Checkout", page_icon="🍱", layout="wide")
 
 if 'customer_db' not in st.session_state:
-    st.session_state.customer_db = {
-        "0912345678": 450, 
-        "0987654321": 120
+    st.session_state.customer_db = {"0912345678": 450}
+
+# Khởi tạo toạ độ TƯƠNG ĐỐI (0.0 -> 1.0) vào bộ nhớ tạm
+if 'box_coords' not in st.session_state:
+    st.session_state.box_coords = {
+        "O_Man1 (Top-Left)":    {"x": 0.05, "y": 0.05, "w": 0.40, "h": 0.40},
+        "O_Man2 (Top-Right)":   {"x": 0.55, "y": 0.05, "w": 0.40, "h": 0.40},
+        "O_Com (Bottom-Left)":  {"x": 0.05, "y": 0.50, "w": 0.40, "h": 0.40},
+        "O_Canh (Bottom-Right)":{"x": 0.55, "y": 0.50, "w": 0.40, "h": 0.40}
     }
 
 MENU_PRICES = {
@@ -63,42 +58,44 @@ MENU_PRICES = {
 }
 CLASS_FOODS = list(MENU_PRICES.keys())
 
-TRAY_COORDS = {
-    "O_Com":  {"x": 50,  "y": 300, "w": 200, "h": 200},
-    "O_Canh": {"x": 270, "y": 300, "w": 200, "h": 200},
-    "O_Man1": {"x": 50,  "y": 50,  "w": 150, "h": 150},
-    "O_Man2": {"x": 220, "y": 50,  "w": 150, "h": 150}
-}
-
-# ==========================================
-# CÁC HÀM XỬ LÝ LÕI
-# ==========================================
 @st.cache_resource
 def load_ai_model():
     return tf.keras.models.load_model('mo_hinh_mobilenet_12_mon_HOAN_HAO.h5', compile=False)
 
-def generate_qr_code(amount):
-    qr_data = f"Thanh toan Canteen: {amount:,.0f} VND\nSTK: 123456789 (MOCK)"
-    qr = qrcode.QRCode(box_size=10, border=4)
-    qr.add_data(qr_data)
-    qr.make(fit=True)
-    img_qr = qr.make_image(fill_color="black", back_color="white")
+# ==========================================
+# CÁC HÀM XỬ LÝ ẢNH & DRAW BOX
+# ==========================================
+def draw_calibration_boxes(img_array, coords_dict):
+    img_draw = img_array.copy()
+    h_img, w_img, _ = img_draw.shape
     
-    buf = io.BytesIO()
-    img_qr.save(buf, format="PNG")
-    return buf.getvalue()
-
-def process_and_predict(img_array, model):
-    detected_items = []
-    
-    for ten_o, toa_do in TRAY_COORDS.items():
-        x, y, w, h = toa_do["x"], toa_do["y"], toa_do["w"], toa_do["h"]
+    for name, box in coords_dict.items():
+        # Chuyển đổi từ tỉ lệ % sang pixel thực tế của ảnh
+        x = int(box['x'] * w_img)
+        y = int(box['y'] * h_img)
+        w = int(box['w'] * w_img)
+        h = int(box['h'] * h_img)
         
-        if y+h > img_array.shape[0] or x+w > img_array.shape[1]:
-            continue
+        # Vẽ khung và tên
+        cv2.rectangle(img_draw, (x, y), (x+w, y+h), (0, 255, 0), 3)
+        cv2.putText(img_draw, name.split(" ")[0], (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    return img_draw
+
+def process_and_predict(img_array, model, coords_dict):
+    detected_items = []
+    h_img, w_img, _ = img_array.shape
+    
+    for name, box in coords_dict.items():
+        x = int(box['x'] * w_img)
+        y = int(box['y'] * h_img)
+        w = int(box['w'] * w_img)
+        h = int(box['h'] * h_img)
+        
+        if y+h > h_img or x+w > w_img: continue
             
         cropped = img_array[y:y+h, x:x+w]
-        
+        if cropped.size == 0: continue
+            
         resized = cv2.resize(cropped, (224, 224))
         photo_array = np.array(resized, dtype=np.float32)
         preprocessed = preprocess_input(photo_array)
@@ -111,84 +108,75 @@ def process_and_predict(img_array, model):
         if score > 0.6: 
             food_name = CLASS_FOODS[max_idx]
             price = MENU_PRICES[food_name]
-            detected_items.append({"Món": food_name, "Giá": price, "Ảnh": cropped})
+            detected_items.append({"Món": food_name, "Giá": price, "Ảnh": cropped, "Vị trí": name.split(" ")[0]})
             
     return detected_items
 
 # ==========================================
 # GIAO DIỆN CHÍNH (UI)
 # ==========================================
-st.title("🍱 Hệ Thống Nhận Diện Khay Cơm & Thanh Toán Thông Minh")
-st.markdown("---")
+st.title("🍱 Hệ Thống Nhận Diện Khay Cơm")
+
+# Thanh Sidebar chứa công cụ
+with st.sidebar:
+    st.header("⚙️ Cài đặt hệ thống")
+    che_do_can_chinh = st.checkbox("🛠 Bật chế độ Căn Chỉnh Khung", value=True)
+    
+    if che_do_can_chinh:
+        st.markdown("---")
+        st.subheader("Bảng Điều Khiển Toạ Độ")
+        selected_box = st.selectbox("Chọn ô cần chỉnh:", list(st.session_state.box_coords.keys()))
+        
+        st.write(f"**Đang chỉnh:** `{selected_box}`")
+        col_x, col_y = st.columns(2)
+        st.session_state.box_coords[selected_box]['x'] = col_x.slider("Vị trí X (Trái/Phải)", 0.0, 1.0, st.session_state.box_coords[selected_box]['x'], 0.01)
+        st.session_state.box_coords[selected_box]['y'] = col_y.slider("Vị trí Y (Lên/Xuống)", 0.0, 1.0, st.session_state.box_coords[selected_box]['y'], 0.01)
+        
+        col_w, col_h = st.columns(2)
+        st.session_state.box_coords[selected_box]['w'] = col_w.slider("Chiều rộng (W)", 0.05, 1.0, st.session_state.box_coords[selected_box]['w'], 0.01)
+        st.session_state.box_coords[selected_box]['h'] = col_h.slider("Chiều cao (H)", 0.05, 1.0, st.session_state.box_coords[selected_box]['h'], 0.01)
+        
+        st.markdown("---")
+        st.success("Khi căn chỉnh xong, hãy copy bộ toạ độ này dán vào code để cố định:")
+        st.code(json.dumps(st.session_state.box_coords, indent=4), language="json")
 
 model = load_ai_model()
 
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
-    st.subheader("1. Đặt khay cơm vào camera")
-    camera_photo = st.camera_input("📸 Hãy đưa khay cơm vào khung hình và bấm nút Chụp")
+    camera_photo = st.camera_input("📸 Đưa khay cơm vào và chụp")
     
     if camera_photo:
         file_bytes = np.asarray(bytearray(camera_photo.read()), dtype=np.uint8)
         img_bgr = cv2.imdecode(file_bytes, 1)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         
-        with st.spinner("AI đang phân tích món ăn..."):
-            items = process_and_predict(img_rgb, model)
-            
-        st.success(f"Nhận diện thành công {len(items)} món ăn!")
-        
-        cols = st.columns(4)
-        for idx, item in enumerate(items):
-            with cols[idx % 4]:
-                st.image(item["Ảnh"], width=100)
-                st.caption(f"{item['Món']}")
+        if che_do_can_chinh:
+            # Hiển thị ảnh kèm khung xanh để người dùng kéo thả thanh trượt
+            st.subheader("Góc nhìn Camera (Đang căn chỉnh)")
+            img_with_boxes = draw_calibration_boxes(img_rgb, st.session_state.box_coords)
+            st.image(img_with_boxes, use_container_width=True)
+            st.info("👈 Hãy dùng thanh trượt ở menu bên trái để khớp các khung xanh vào đúng vị trí khay thức ăn.")
+        else:
+            # Chạy AI dự đoán thực tế
+            with st.spinner("AI đang phân tích món ăn..."):
+                items = process_and_predict(img_rgb, model, st.session_state.box_coords)
+                
+            st.success(f"Nhận diện thành công {len(items)} món ăn!")
+            cols = st.columns(4)
+            for idx, item in enumerate(items):
+                with cols[idx % 4]:
+                    st.image(item["Ảnh"], width=100)
+                    st.caption(f"{item['Món']}")
 
 with col2:
-    st.subheader("2. Hóa Đơn & Tích Điểm")
-    
-    if camera_photo and 'items' in locals() and items:
-        tong_tien = sum(item["Giá"] for item in items)
-        
-        st.write("**Các món đã nhận diện:**")
-        for item in items:
-            st.write(f"- {item['Món']}: `{item['Giá']:,.0f} đ`")
-            
-        st.markdown(f"### Tổng tạm tính: {tong_tien:,.0f} đ")
-        st.markdown("---")
-        
-        phone = st.text_input("Nhập SĐT Khách Hàng (Tích điểm):", placeholder="VD: 0912345678")
-        giam_gia = 0
-        diem_cong_them = int(tong_tien / 1000)
-        
-        if phone:
-            diem_hien_tai = st.session_state.customer_db.get(phone, 0)
-            st.info(f"Khách hàng đang có: **{diem_hien_tai} điểm**")
-            
-            if diem_hien_tai >= 500:
-                giam_gia = int(tong_tien * 0.10)
-                st.success("🎉 Khách hàng VIP: Được giảm 10%!")
-                
-                if st.button("Áp dụng giảm giá (-500 điểm)"):
-                    st.session_state.customer_db[phone] -= 500
-                    st.rerun()
-            else:
-                st.warning(f"Cần thêm {500 - diem_hien_tai} điểm để được giảm 10% tháng này.")
-        
-        thanh_tien = tong_tien - giam_gia
-        
-        st.markdown(f"## THÀNH TIỀN: {thanh_tien:,.0f} đ")
-        if phone:
-            st.caption(f"*(Sau khi thanh toán, SĐT {phone} sẽ được cộng thêm {diem_cong_them} điểm)*")
-        
-        st.markdown("---")
-        st.write("Quét mã QR để thanh toán (Mock):")
-        qr_bytes = generate_qr_code(thanh_tien)
-        st.image(qr_bytes, width=200)
-        
-        if st.button("✅ HOÀN TẤT GIAO DỊCH", type="primary", use_container_width=True):
-            if phone:
-                st.session_state.customer_db[phone] = st.session_state.customer_db.get(phone, 0) + diem_cong_them
-            st.balloons()
-            st.success("Giao dịch thành công! Xin cảm ơn quý khách.")
+    if not che_do_can_chinh:
+        st.subheader("Hóa Đơn")
+        if camera_photo and 'items' in locals() and items:
+            tong_tien = sum(item["Giá"] for item in items)
+            for item in items:
+                st.write(f"- {item['Món']}: `{item['Giá']:,.0f} đ`")
+            st.markdown(f"### Tổng: {tong_tien:,.0f} đ")
+    elif che_do_can_chinh:
+        st.warning("Vui lòng tắt 'Chế độ Căn Chỉnh Khung' ở menu bên trái để hệ thống tiến hành nhận diện AI và tính tiền.")
