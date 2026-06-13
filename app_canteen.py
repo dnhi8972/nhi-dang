@@ -41,13 +41,14 @@ st.set_page_config(page_title="AI Canteen Smart Checkout", page_icon="🍱", lay
 if 'customer_db' not in st.session_state:
     st.session_state.customer_db = {"0912345678": 450}
 
-# Khởi tạo toạ độ TƯƠNG ĐỐI (0.0 -> 1.0) vào bộ nhớ tạm
+# Khởi tạo toạ độ 5 NGĂN TƯƠNG ĐỐI (0.0 -> 1.0)
 if 'box_coords' not in st.session_state:
     st.session_state.box_coords = {
-        "O_Man1 (Top-Left)":    {"x": 0.05, "y": 0.05, "w": 0.40, "h": 0.40},
-        "O_Man2 (Top-Right)":   {"x": 0.55, "y": 0.05, "w": 0.40, "h": 0.40},
-        "O_Com (Bottom-Left)":  {"x": 0.05, "y": 0.50, "w": 0.40, "h": 0.40},
-        "O_Canh (Bottom-Right)":{"x": 0.55, "y": 0.50, "w": 0.40, "h": 0.40}
+        "O_Canh (Top-Left)":      {"x": 0.05, "y": 0.05, "w": 0.40, "h": 0.45},
+        "O_Com (Top-Right)":      {"x": 0.50, "y": 0.05, "w": 0.45, "h": 0.45},
+        "O_Man1 (Bottom-Left)":   {"x": 0.05, "y": 0.55, "w": 0.28, "h": 0.40},
+        "O_Man2 (Bottom-Center)": {"x": 0.35, "y": 0.55, "w": 0.28, "h": 0.40},
+        "O_Man3 (Bottom-Right)":  {"x": 0.65, "y": 0.55, "w": 0.28, "h": 0.40}
     }
 
 MENU_PRICES = {
@@ -70,13 +71,11 @@ def draw_calibration_boxes(img_array, coords_dict):
     h_img, w_img, _ = img_draw.shape
     
     for name, box in coords_dict.items():
-        # Chuyển đổi từ tỉ lệ % sang pixel thực tế của ảnh
         x = int(box['x'] * w_img)
         y = int(box['y'] * h_img)
         w = int(box['w'] * w_img)
         h = int(box['h'] * h_img)
         
-        # Vẽ khung và tên
         cv2.rectangle(img_draw, (x, y), (x+w, y+h), (0, 255, 0), 3)
         cv2.putText(img_draw, name.split(" ")[0], (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
     return img_draw
@@ -153,21 +152,19 @@ with col1:
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         
         if che_do_can_chinh:
-            # Hiển thị ảnh kèm khung xanh để người dùng kéo thả thanh trượt
             st.subheader("Góc nhìn Camera (Đang căn chỉnh)")
             img_with_boxes = draw_calibration_boxes(img_rgb, st.session_state.box_coords)
             st.image(img_with_boxes, use_container_width=True)
             st.info("👈 Hãy dùng thanh trượt ở menu bên trái để khớp các khung xanh vào đúng vị trí khay thức ăn.")
         else:
-            # Chạy AI dự đoán thực tế
             with st.spinner("AI đang phân tích món ăn..."):
                 items = process_and_predict(img_rgb, model, st.session_state.box_coords)
                 
             st.success(f"Nhận diện thành công {len(items)} món ăn!")
-            cols = st.columns(4)
+            cols = st.columns(5) # Chia làm 5 cột hiển thị ảnh đã cắt
             for idx, item in enumerate(items):
-                with cols[idx % 4]:
-                    st.image(item["Ảnh"], width=100)
+                with cols[idx % 5]:
+                    st.image(item["Ảnh"], width=80)
                     st.caption(f"{item['Món']}")
 
 with col2:
@@ -180,3 +177,4 @@ with col2:
             st.markdown(f"### Tổng: {tong_tien:,.0f} đ")
     elif che_do_can_chinh:
         st.warning("Vui lòng tắt 'Chế độ Căn Chỉnh Khung' ở menu bên trái để hệ thống tiến hành nhận diện AI và tính tiền.")
+    
