@@ -4,4 +4,3 @@ opencv-python-headless
 qrcode
 pillow
 numpy
-qrcode[pil]
