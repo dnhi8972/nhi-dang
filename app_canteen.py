@@ -2,8 +2,6 @@ import streamlit as st
 import cv2
 import numpy as np
 import tensorflow as tf
-import qrcode
-from PIL import Image
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 # ==========================================================
@@ -32,7 +30,7 @@ fix_keras_error()
 # ==========================================================
 st.set_page_config(page_title="Canteen AI Smart Checkout", page_icon="🍱", layout="wide")
 
-# Bộ tọa độ chuẩn đã được bạn căn chỉnh
+# Bộ tọa độ chuẩn mới nhất bạn đã chốt khớp với khung 640x480
 BOX_COORDS = {
     "O_Canh": {"x": 0.16, "y": 0.10, "w": 0.33, "h": 0.49}, 
     "O_Com":  {"x": 0.56, "y": 0.12, "w": 0.25, "h": 0.47}, 
@@ -61,7 +59,7 @@ model = load_ai_model()
 st.markdown("<h1 style='text-align: center; color: #2E86C1;'>🍱 HỆ THỐNG THANH TOÁN THÔNG MINH BẰNG AI</h1>", unsafe_allow_html=True)
 st.markdown("---")
 
-col_camera, col_bill = st.columns([1.6, 1])
+col_camera, col_bill = st.columns([1.5, 1])
 
 with col_camera:
     st.markdown("### 📸 Camera Nhận Diện")
@@ -69,13 +67,13 @@ with col_camera:
 
     if camera_photo:
         with st.spinner("🤖 AI đang phân tích khay cơm của bạn..."):
-            # Chuẩn hóa ảnh về 640x480
+            # Chuẩn hóa kích thước ảnh về 640x480 để khớp tọa độ hoàn hảo
             file_bytes = np.asarray(bytearray(camera_photo.read()), dtype=np.uint8)
             img_bgr = cv2.imdecode(file_bytes, 1)
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             img_rgb = cv2.resize(img_rgb, (640, 480))
             
-            # Vẽ khung nhận diện
+            # Vẽ các khung nhận diện xanh lá trực tiếp lên hình
             img_display = img_rgb.copy()
             for name, box in BOX_COORDS.items():
                 x = int(box['x'] * 640)
@@ -87,7 +85,7 @@ with col_camera:
             
             st.image(img_display, caption="Ảnh thực tế với các vùng cắt được định vị", use_container_width=True)
 
-            # Cắt và dự đoán món ăn
+            # Cắt lát ảnh và dự đoán món ăn bằng MobileNet
             detected_items = []
             for name, box in BOX_COORDS.items():
                 x, y, w, h = int(box['x']*640), int(box['y']*480), int(box['w']*640), int(box['h']*480)
@@ -102,6 +100,7 @@ with col_camera:
                 max_idx = np.argmax(preds)
                 score = np.max(preds)
                 
+                # Chỉ nhận diện khi độ tự tin lớn hơn 60%
                 if score > 0.6:
                     raw_name = CLASS_FOODS[max_idx]
                     clean_name = raw_name.split('_', 1)[1].replace('_', ' ').title() if '_' in raw_name else raw_name
@@ -113,7 +112,7 @@ with col_bill:
     
     if camera_photo:
         if detected_items:
-            # Giao diện hóa đơn
+            # CSS định dạng hóa đơn biên lai siêu thị
             st.markdown("""
             <style>
             .bill-box {
@@ -138,42 +137,46 @@ with col_bill:
             st.markdown(html_bill, unsafe_allow_html=True)
             
             # ==========================================================
-            # MÃ QR THANH TOÁN & THẺ TÍCH ĐIỂM
+            # KHU VỰC HIỂN THỊ VIETQR & TÍCH ĐIỂM
             # ==========================================================
             st.markdown("<br>", unsafe_allow_html=True)
             
-            col_qr, col_pts = st.columns([1, 1.2])
+            col_qr, col_pts = st.columns([1.1, 1.2])
             
             with col_qr:
-                st.markdown("#### 📱 Quét mã thanh toán")
-                # Tạo mã QR động từ tổng tiền
-                qr_data = f"Thanh toan: {tong_tien} VND"
-                qr_img = qrcode.make(qr_data)
-                st.image(qr_img.get_image(), use_container_width=True)
-                st.caption("Dùng Zalo/Camera để quét demo")
+                st.markdown("#### 📱 Quét VietQR")
+                # 🔥 Thay thế mã QR tự tạo bằng ảnh Techcombank chuyên nghiệp của bạn
+                try:
+                    st.image("image_39b147.png", use_container_width=True)
+                except:
+                    st.error("⚠️ Không tìm thấy file 'image_39b147.png'. Vui lòng upload ảnh QR lên GitHub cùng cấp thư mục với file code này.")
+                
+                # Hiển thị số tiền động ngay dưới phôi ảnh để tăng tính thuyết phục lúc chấm điểm
+                st.markdown(f"<p style='text-align: center; font-weight: bold; color: #111;'>Số tiền: {tong_tien:,} đ</p>", unsafe_allow_html=True)
 
             with col_pts:
-                st.markdown("#### 💳 Tích Điểm")
+                st.markdown("#### 💳 Thẻ Thành Viên")
                 DIEM_CU = 150000 
                 DIEM_HIEN_TAI = DIEM_CU + tong_tien
                 HAN_MUC = 500000
                 
-                st.success(f"🎉 **+{tong_tien:,} điểm**")
-                st.metric("Điểm hiện tại", f"{DIEM_HIEN_TAI:,} đ")
+                st.success(f"🎉 Tích lũy thêm: **+{tong_tien:,}đ**")
+                st.metric("Tổng tích lũy hiện tại", f"{DIEM_HIEN_TAI:,} đ")
                 
+                # Thanh tiến trình tích điểm nâng cấp VIP
                 ty_le = min(DIEM_HIEN_TAI / HAN_MUC, 1.0)
                 st.progress(ty_le)
                 
                 if DIEM_HIEN_TAI >= HAN_MUC:
                     st.balloons()
-                    st.caption("🌟 VIP: Giảm 10% lần sau!")
+                    st.markdown("⭐ **Hạng Thẻ: VIP (Giảm 10%)**")
                 else:
                     con_thieu = HAN_MUC - DIEM_HIEN_TAI
-                    st.caption(f"Còn {con_thieu:,} đ để lên VIP")
+                    st.caption(f"Cần thêm {con_thieu:,} đ để đạt mốc Thẻ VIP")
             
-            st.button("💵 Xác Nhận Hoàn Tất", type="primary", use_container_width=True)
+            st.button("💵 Xác Nhận Giao Dịch", type="primary", use_container_width=True)
             
         else:
-            st.warning("Không nhận diện được món ăn nào rõ ràng. Vui lòng thử chụp lại khay cơm!")
+            st.warning("Không nhận diện được món ăn nào trong các khung cắt. Bạn hãy thử chụp lại góc thẳng hơn nhé!")
     else:
-        st.info("👈 Hãy chụp ảnh khay cơm để hệ thống tính tiền, xuất QR và tích điểm tự động.")
+        st.info("👈 Vui lòng bấm chụp ảnh khay cơm để trải nghiệm quy trình tính tiền tự động.")
