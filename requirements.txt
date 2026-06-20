@@ -1,6 +1,4 @@
 streamlit
-tensorflow-cpu
 opencv-python-headless
-qrcode
-pillow
 numpy
+tensorflow
