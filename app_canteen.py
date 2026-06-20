@@ -101,7 +101,7 @@ with col_camera:
                 score = np.max(preds)
                 
                 # Chỉ nhận diện khi độ tự tin lớn hơn 60%
-                if score > 0.6:
+                if score > 0.4:
                     raw_name = CLASS_FOODS[max_idx]
                     clean_name = raw_name.split('_', 1)[1].replace('_', ' ').title() if '_' in raw_name else raw_name
                     price = MENU_PRICES[raw_name]
