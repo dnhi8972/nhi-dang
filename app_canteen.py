@@ -40,10 +40,10 @@ BOX_COORDS = {
 }
 
 MENU_PRICES = {
-    '00_Com_trang': 10000, '01_Dau_hu_sot_ca': 25000, '02_Ca_kho': 30000, 
-    '03_Thit_kho_trung': 30000, '04_Rau_muong_xao': 10000, '05_Canh_chua_co_ca': 15000,
-    '06_Canh_chua_ko_ca': 10000, '07_Suon_nuong': 30000, '08_Canh_cai': 7000,
-    '09_Thit_kho': 25000, '10_Trung_chien': 25000, '11_Rau_luoc': 10000
+    '00_Com_trang': 5000, '01_Dau_hu_sot_ca': 15000, '02_Ca_kho': 20000, 
+    '03_Thit_kho_trung': 25000, '04_Rau_muong_xao': 10000, '05_Canh_chua_co_ca': 15000,
+    '06_Canh_chua_ko_ca': 10000, '07_Suon_nuong': 30000, '08_Canh_cai': 10000,
+    '09_Thit_kho': 20000, '10_Trung_chien': 10000, '11_Rau_luoc': 10000
 }
 CLASS_FOODS = list(MENU_PRICES.keys())
 
@@ -60,6 +60,9 @@ st.markdown("<h1 style='text-align: center; color: #2E86C1;'>🍱 HỆ THỐNG T
 st.markdown("---")
 
 col_camera, col_bill = st.columns([1.4, 1])
+
+# Biến lưu trữ kết quả nhận diện
+detected_items = []
 
 with col_camera:
     st.markdown("### 📸 Camera Nhận Diện")
@@ -82,8 +85,7 @@ with col_camera:
             st.image(img_display, caption="Ảnh chụp thực tế từ hệ thống", use_container_width=True)
 
             # --- KHU VỰC AI PHÂN TÍCH ---
-            detected_items = []
-            debug_logs = [] # Lưu thông tin dự đoán để hiện lên màn hình
+            debug_logs = []
             
             for name, box in BOX_COORDS.items():
                 x, y, w, h = int(box['x']*640), int(box['y']*480), int(box['w']*640), int(box['h']*480)
@@ -92,12 +94,9 @@ with col_camera:
                 
                 resized = cv2.resize(cropped, (224, 224))
                 
-                # 🛠️ KIỂM TRA ĐIỀU CHỈNH CHUẨN HÓA SỐ LIỆU (Xem mục lưu ý phía dưới)
-                # Cách 1: Dùng chuẩn hóa mặc định của MobileNetV2 ([-1, 1])
-                input_tensor = np.expand_dims(preprocess_input(np.array(resized, dtype=np.float32)), axis=0)
-                
-                # Cách 2: Chia 255.0 ([0, 1]) -> Nếu cách 1 ra kết quả sai, hãy mở comment dòng dưới và khóa dòng trên lại
-                # input_tensor = np.expand_dims(np.array(resized, dtype=np.float32) / 255.0, axis=0)
+                # Chuẩn hóa ảnh. Thử Cách 1 trước. Nếu sai màu, đổi comment Cách 2
+                input_tensor = np.expand_dims(preprocess_input(np.array(resized, dtype=np.float32)), axis=0) # Cách 1
+                # input_tensor = np.expand_dims(np.array(resized, dtype=np.float32) / 255.0, axis=0) # Cách 2
                 
                 preds = model.predict(input_tensor, verbose=0)
                 max_idx = np.argmax(preds)
@@ -106,59 +105,63 @@ with col_camera:
                 raw_name = CLASS_FOODS[max_idx]
                 clean_name = raw_name.split('_', 1)[1].replace('_', ' ').title() if '_' in raw_name else raw_name
                 
-                # Ghi lại log để kiểm tra
                 debug_logs.append(f"📍 **{name}**: Đoán là `{clean_name}` | Độ tự tin: `{score*100:.1f}%`")
                 
-                # NGƯỠNG ĐỘ TỰ TIN: Chỉ lấy món nếu AI chắc chắn trên 50%
                 if score > 0.5:
                     detected_items.append({"Món": clean_name, "Giá": MENU_PRICES[raw_name]})
             
-            # Hiển thị bảng Log AI dưới camera để debug công khai trước hội đồng
-            with st.expander("🤖 NHẬT KÝ PHÂN TÍCH CỦA AI (XEM ĐỘ TỰ TIN %)", expanded=True):
+            with st.expander("🤖 NHẬT KÝ PHÂN TÍCH CỦA AI (XEM ĐỘ TỰ TIN %)", expanded=False):
                 for log in debug_logs:
                     st.write(log)
 
 with col_bill:
     st.markdown("### 🧾 Hóa Đơn Chi Tiết")
-    if camera_photo:
-        if detected_items:
-            st.markdown("""
-            <style>
-            .bill-box { background-color: #f9f9f9; border-radius: 10px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-            .item-row { display: flex; justify-content: space-between; font-size: 18px; margin-bottom: 10px; border-bottom: 1px dashed #ccc;}
-            .total-row { display: flex; justify-content: space-between; font-size: 24px; font-weight: bold; color: #d32f2f; margin-top: 20px; }
-            </style>
-            """, unsafe_allow_html=True)
+    
+    # Ép CSS màu đen cho Dark Mode
+    st.markdown("""
+    <style>
+    .bill-box { background-color: #f9f9f9; color: #111111; border-radius: 10px; padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .item-row { display: flex; justify-content: space-between; font-size: 18px; margin-bottom: 10px; border-bottom: 1px dashed #ccc; color: #111111;}
+    .total-row { display: flex; justify-content: space-between; font-size: 24px; font-weight: bold; color: #d32f2f; margin-top: 20px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-            tong_tien = sum(item["Giá"] for item in detected_items)
-            
-            html_bill = '<div class="bill-box">'
-            for item in detected_items:
-                html_bill += f'<div class="item-row"><span>🍽️ {item["Món"]}</span><span>{item["Giá"]:,} đ</span></div>'
-            html_bill += f'<div class="total-row"><span>TỔNG CỘNG:</span><span>{tong_tien:,} VNĐ</span></div>'
-            html_bill += '</div>'
-            st.markdown(html_bill, unsafe_allow_html=True)
-            
-            # QR & Tích điểm
-            st.markdown("<br>", unsafe_allow_html=True)
-            col_qr, col_pts = st.columns([1.1, 1.2])
-            with col_qr:
-                st.markdown("#### 📱 Quét VietQR")
-                try: st.image("image_39b147.png", use_container_width=True)
-                except: st.error("⚠️ Thiếu file 'image_39b147.png'")
-                st.markdown(f"<p style='text-align: center; font-weight: bold;'>Số tiền: {tong_tien:,} đ</p>", unsafe_allow_html=True)
-
-            with col_pts:
-                st.markdown("#### 💳 Thẻ Thành Viên")
-                DIEM_CU = 150000 
-                DIEM_HIEN_TAI = DIEM_CU + tong_tien
-                HAN_MUC = 500000
-                st.success(f"🎉 +{tong_tien:,}đ")
-                st.metric("Tổng tích lũy", f"{DIEM_HIEN_TAI:,} đ")
-                st.progress(min(DIEM_HIEN_TAI / HAN_MUC, 1.0))
-            
-            st.button("💵 Xác Nhận Giao Dịch", type="primary", use_container_width=True)
-        else:
-            st.warning("⚠️ AI nhận diện độ tự tin thấp (Dưới 50%). Vui lòng xem 'Nhật ký phân tích của AI' ở bên dưới để biết chi tiết lý do!")
+    # Tính tiền
+    tong_tien = sum(item["Giá"] for item in detected_items) if detected_items else 0
+    
+    html_bill = '<div class="bill-box">'
+    if detected_items:
+        for item in detected_items:
+            html_bill += f'<div class="item-row"><span>🍽️ {item["Món"]}</span><span>{item["Giá"]:,} đ</span></div>'
     else:
-        st.info("👈 Vui lòng bấm chụp ảnh khay cơm.")
+        # Hóa đơn trống (dành cho lúc chưa chụp)
+        html_bill += f'<div class="item-row" style="color: #888;"><span>Đang chờ khay cơm...</span><span>0 đ</span></div>'
+        
+    html_bill += f'<div class="total-row"><span>TỔNG CỘNG:</span><span>{tong_tien:,} VNĐ</span></div>'
+    html_bill += '</div>'
+    st.markdown(html_bill, unsafe_allow_html=True)
+    
+    # Khu vực QR và Điểm (Hiện ngay cả khi chưa chụp)
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_qr, col_pts = st.columns([1.1, 1.2])
+    with col_qr:
+        st.markdown("#### 📱 Quét VietQR")
+        try: st.image("image_39b147.png", use_container_width=True)
+        except: st.error("⚠️ Thiếu file 'image_39b147.png'")
+        st.markdown(f"<p style='text-align: center; font-weight: bold; color: #111;'>Số tiền: {tong_tien:,} đ</p>", unsafe_allow_html=True)
+
+    with col_pts:
+        st.markdown("#### 💳 Thẻ Thành Viên")
+        DIEM_CU = 150000 
+        DIEM_HIEN_TAI = DIEM_CU + tong_tien
+        HAN_MUC = 500000
+        
+        if tong_tien > 0:
+            st.success(f"🎉 +{tong_tien:,}đ")
+        else:
+            st.info("Chờ giao dịch...")
+            
+        st.metric("Tổng tích lũy", f"{DIEM_HIEN_TAI:,} đ")
+        st.progress(min(DIEM_HIEN_TAI / HAN_MUC, 1.0))
+    
+    st.button("💵 Xác Nhận Giao Dịch", type="primary", use_container_width=True)
