@@ -40,10 +40,10 @@ BOX_COORDS = {
 }
 
 MENU_PRICES = {
-    '00_Com_trang': 5000, '01_Dau_hu_sot_ca': 15000, '02_Ca_kho': 20000, 
-    '03_Thit_kho_trung': 25000, '04_Rau_muong_xao': 10000, '05_Canh_chua_co_ca': 15000,
-    '06_Canh_chua_ko_ca': 10000, '07_Suon_nuong': 30000, '08_Canh_cai': 10000,
-    '09_Thit_kho': 20000, '10_Trung_chien': 10000, '11_Rau_luoc': 10000
+    '00_Com_trang': 10000, '01_Dau_hu_sot_ca': 25000, '02_Ca_kho': 30000, 
+    '03_Thit_kho_trung': 30000, '04_Rau_muong_xao': 10000, '05_Canh_chua_co_ca': 15000,
+    '06_Canh_chua_ko_ca': 10000, '07_Suon_nuong': 30000, '08_Canh_cai': 7000,
+    '09_Thit_kho': 25000, '10_Trung_chien': 25000, '11_Rau_luoc': 10000
 }
 CLASS_FOODS = list(MENU_PRICES.keys())
 
