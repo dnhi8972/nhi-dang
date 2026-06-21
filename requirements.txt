@@ -1,7 +1,0 @@
-streamlit
-numpy
-scikit-fuzzy
-folium
-requests
-geopy
-streamlit-folium
